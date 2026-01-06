@@ -1,0 +1,105 @@
+from numpy.core.multiarray import _reconstruct
+from ultralyticsplus import YOLO, render_result
+import ultralytics
+import os
+import torch
+
+def yolo_kitti():
+    # set the directory containing thermal images
+    main_dir = "/mnt/d/kitti_mots"
+
+    for subset in ["testing"]:
+        print(f"Processing subset: {subset}")
+    
+        subset_dir = f"{main_dir}/{subset}"
+        image_dir = f"{subset_dir}/image_02"
+        output_dir = f"{subset_dir}/YOLOv11_detections"
+        os.makedirs(output_dir, exist_ok=True)
+        
+
+        for sequence in os.listdir(image_dir):
+            print(f"Processing sequence: {sequence}")
+            output_sequence_dir_image = f"{output_dir}/images/{sequence}"
+            output_sequence_dir_det = f"{output_dir}/det"
+            sequence_image_dir = f"{image_dir}/{sequence}"
+
+            os.makedirs(f"{output_dir}/images", exist_ok=True)
+            os.makedirs(output_sequence_dir_image, exist_ok=True)
+            os.makedirs(output_sequence_dir_det, exist_ok=True)
+
+            text_output_file = f"{output_sequence_dir_det}/{sequence}.txt"
+
+            with open(text_output_file, 'w') as f:
+                id_frame = 0
+
+                # iterate through all files in the directory
+                for file in os.listdir(sequence_image_dir):
+                    image = os.path.join(sequence_image_dir, file)
+
+                    # perform inference
+                    results = model.predict(image, classes=[0, 2])
+
+                    # observe results
+                    render = render_result(model=model, image=image, result=results[0])
+                    render.save(f"{output_sequence_dir_image}/{file}.png")
+
+                    # Save results to text file
+                    for box in results[0].boxes:
+                        if int(box.cls[0]) == 0:
+                            class_id = 2  # Car
+                        else:
+                            class_id = 1
+                        f.write(f"{id_frame} {box.xyxy[0][0]} {box.xyxy[0][1]} {box.xyxy[0][2]} {box.xyxy[0][3]} {box.conf[0]:.2f} {class_id} {box.orig_shape[0]} {box.orig_shape[1]} 0\n")
+
+                    # Increment frame ID
+                    id_frame += 1
+
+def yolo_mot(main_dir, mot_dataset):
+    for subset in ["train","test"]:
+        print(f"Processing subset: {subset}")
+    
+        subset_dir = f"{main_dir}/{subset}"
+
+        for sequence in os.listdir(subset_dir):
+            sequence_image_dir = f"{subset_dir}/{sequence}/img1"
+            output_dir = f"{subset_dir}/{sequence}/YOLOv11_detections"
+            os.makedirs(output_dir, exist_ok=True)
+
+            print(f"{mot_dataset} - {subset} - {sequence}")
+            output_sequence_dir_image = f"{output_dir}/images"
+
+            os.makedirs(output_sequence_dir_image, exist_ok=True)
+
+            text_output_file = f"{output_dir}/detections.txt"
+
+            with open(text_output_file, 'w') as f:
+                id_frame = 0
+
+                # iterate through all files in the directory
+                for file in os.listdir(sequence_image_dir):
+                    image = os.path.join(sequence_image_dir, file)
+
+                    # perform inference
+                    results = model.predict(image, classes=[0])
+
+                    # observe results
+                    render = render_result(model=model, image=image, result=results[0])
+                    render.save(f"{output_sequence_dir_image}/{file}.png")
+
+                    # Save results to text file
+                    for box in results[0].boxes:
+                        if int(box.cls[0]) == 0:
+                            class_id = 2  # Car
+                        else:
+                            class_id = 1
+                        f.write(f"{id_frame} {box.xyxy[0][0]} {box.xyxy[0][1]} {box.xyxy[0][2]} {box.xyxy[0][3]} {box.conf[0]:.2f} {class_id} {box.orig_shape[0]} {box.orig_shape[1]} 0\n")
+
+                    # Increment frame ID
+                    id_frame += 1
+
+# Load a COCO-pretrained YOLO11n model
+model = YOLO("yolo_checkpoints/yolo11x.pt")
+
+#yolo_kitti()
+for mot_dataset in ["MOT15","MOT17","MOT20","MOTS"]:
+    yolo_mot(main_dir=f"/mnt/d/{mot_dataset}/{mot_dataset}", mot_dataset=mot_dataset)
