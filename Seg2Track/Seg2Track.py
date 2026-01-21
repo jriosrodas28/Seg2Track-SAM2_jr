@@ -4,8 +4,19 @@ import os
 from glob import glob
 from tqdm import tqdm
 
-def Seg2Track(detection_file, predictor, inference_state, frames_dir, params, output_folder, sequence):
-    ann_obj_id = 0  # give a unique id to each object we interact with (it can be any integers)
+def Seg2Track(
+    detection_file,
+    predictor,
+    inference_state,
+    frames_dir,
+    params,
+    output_folder,
+    sequence,
+    frame_offset=0,
+    obj_id_offset=0,
+    append_output=False,
+):
+    ann_obj_id = obj_id_offset  # give a unique id to each object we interact with (it can be any integers)
     class_id_match = {}  # maps the class id to the object id in the inference state
     removal_dic = {}
     class_map = {1: "Car", 2: "Pedestrian"} # Class mapping (KITTI MOTS)
@@ -59,10 +70,12 @@ def Seg2Track(detection_file, predictor, inference_state, frames_dir, params, ou
     os.makedirs(f"{output_folder}/{output_tag}/annotations_mots/Seg2Track/data", exist_ok=True)
     os.makedirs(f"{output_folder}/{output_tag}/annotations_mot/Seg2Track/data", exist_ok=True)
 
-    with open(mots_output_annotations_file, "w") as mots_result_file:
-        with open(mot_output_annotations_file, "w") as mot_result_file:
+    output_mode = "a" if append_output else "w"
+    with open(mots_output_annotations_file, output_mode) as mots_result_file:
+        with open(mot_output_annotations_file, output_mode) as mot_result_file:
             # run propagation throughout the video and collect the results in a dict
             for frame_idx, obj_ids, masks in predictor.propagate_in_video(inference_state):
+                output_frame_idx = frame_idx + frame_offset
                 previous_frame_ids = inference_state['obj_ids'].copy()
 
                 # Read the current frame
@@ -81,7 +94,7 @@ def Seg2Track(detection_file, predictor, inference_state, frames_dir, params, ou
                         else:
                             cv2.rectangle(output_image, (round(box[0]), round(box[1])), (round(box[2]), round(box[3])), (15, 15, 15), 2)
                     if save_images:
-                        cv2.imwrite(f"{output_detections_frame_dir}/frame_{frame_idx:04d}.png", output_image)
+                        cv2.imwrite(f"{output_detections_frame_dir}/frame_{output_frame_idx:04d}.png", output_image)
 
                 # Get the masks from the inference state
                 if inference_state['masks'] is not None:
@@ -192,10 +205,10 @@ def Seg2Track(detection_file, predictor, inference_state, frames_dir, params, ou
 
                     # Write results to 2DMOT format file
                     if dataset_type == "KITTI":
-                        line_out = f"{frame_idx} {obj_id} {class_map.get(class_id,'Unknown')} -1 -1 -1 " \
+                        line_out = f"{output_frame_idx} {obj_id} {class_map.get(class_id,'Unknown')} -1 -1 -1 " \
                         f"{bbox_left} {bbox_top} {bbox_right} {bbox_bottom} -1 -1 -1 -1 -1 -1 -1 {score}"
                     elif dataset_type == "MOT":
-                        line_out = f"{frame_idx+1} {obj_id} {bbox_left} {bbox_top} {bbox_right-bbox_left} {bbox_bottom-bbox_top} {score} -1 -1 -1"
+                        line_out = f"{output_frame_idx+1} {obj_id} {bbox_left} {bbox_top} {bbox_right-bbox_left} {bbox_bottom-bbox_top} {score} -1 -1 -1"
                     mot_result_file.write(line_out + "\n")
 
                     # Remove overlap: only keep mask pixels not already used
@@ -233,11 +246,11 @@ def Seg2Track(detection_file, predictor, inference_state, frames_dir, params, ou
                     rle_mask = binary_mask_to_kitti_rle(mask_bool)
 
                     if dataset_type == "KITTI":
-                        mots_result_file.write(f"{frame_idx} {class_id * 1000 + obj_id} {class_id} {img_height} {img_width} {rle_mask}\n")
+                        mots_result_file.write(f"{output_frame_idx} {class_id * 1000 + obj_id} {class_id} {img_height} {img_width} {rle_mask}\n")
                     elif dataset_type == "MOT":
-                        mots_result_file.write(f"{frame_idx+1} {class_id * 1000 + obj_id} {class_id} {img_height} {img_width} {rle_mask}\n")
+                        mots_result_file.write(f"{output_frame_idx+1} {class_id * 1000 + obj_id} {class_id} {img_height} {img_width} {rle_mask}\n")
                     
                 if save_images:
-                    cv2.imwrite(f"{output_frames_dir}/frame_{frame_idx:04d}.png", output_image)
-                    cv2.imwrite(f"{output_masks_frame_dir}/frame_{frame_idx:04d}.png", masks_image)
+                    cv2.imwrite(f"{output_frames_dir}/frame_{output_frame_idx:04d}.png", output_image)
+                    cv2.imwrite(f"{output_masks_frame_dir}/frame_{output_frame_idx:04d}.png", masks_image)
     return
