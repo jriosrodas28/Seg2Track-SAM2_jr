@@ -4,8 +4,9 @@ from Seg2Track import Seg2Track
 import argparse
 import json
 
-sam2_checkpoint = "/home/diogo/sam2/checkpoints/sam2.1_hiera_large.pt"
+sam2_checkpoint = "/home/james/projects/Seg2Track-SAM2_jr/sam2/checkpoints/sam2.1_hiera_large.pt"
 model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Load config from JSON file")
